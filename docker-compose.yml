@@ -1,0 +1,14 @@
+services:
+  app:
+    build: .
+    image: presight-directory
+    ports:
+      - "${PORT:-3001}:3001"
+    environment:
+      SEED_COUNT: ${SEED_COUNT:-10000}
+    volumes:
+      - presight-data:/data
+    restart: unless-stopped
+
+volumes:
+  presight-data:
