@@ -1,5 +1,5 @@
 {
-  "name": "presight-execise",
+  "name": "presight-exercise",
   "version": "1.0.0",
   "repository": "",
   "author": "",
@@ -9,9 +9,15 @@
     "server"
   ],
   "scripts": {
-    "start": "lerna run start"
+    "start": "lerna run start --parallel",
+    "build": "lerna run build",
+    "test": "npm test -w presight-server",
+    "typecheck": "lerna run typecheck",
+    "db:setup": "npm run db:setup -w presight-server",
+    "db:seed": "npm run db:seed -w presight-server"
   },
   "devDependencies": {
     "lerna": "~8.2.1"
-  }
+  },
+  "private": true
 }
