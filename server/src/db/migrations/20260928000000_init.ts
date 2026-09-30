@@ -13,7 +13,7 @@ export async function up(knex: Knex): Promise<void> {
     t.string('last_name').notNullable();
     t.date('date_of_birth').notNullable();
     t.integer('nationality_id').notNullable().references('nationalities.id');
-    // Composite indexes back keyset pagination for every sortable column.
+    // Composite indexes back sorted pagination for every sortable column.
     t.index(['first_name', 'id']);
     t.index(['last_name', 'id']);
     t.index(['date_of_birth', 'id']);

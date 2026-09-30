@@ -13,11 +13,11 @@ interface Props {
   isFetchingNextPage: boolean;
   nextPageError: Error | null;
   fetchNextPage: () => void;
-  /** Changes whenever the result set is replaced (new filters/sort) so we can jump back to the top. */
   resetKey: string;
 }
 
 export function UserList({ users, hasNextPage, isFetchingNextPage, nextPageError, fetchNextPage, resetKey }: Props) {
+
   const scrollRef = useRef<HTMLDivElement>(null);
   const columns = useColumns(scrollRef);
   const rowCount = Math.ceil(users.length / columns);
@@ -41,7 +41,9 @@ export function UserList({ users, hasNextPage, isFetchingNextPage, nextPageError
 
   // Prefetch the next page once the viewport gets within a few rows of the end.
   useEffect(() => {
-    if (hasNextPage && !isFetchingNextPage && !nextPageError && lastIndex >= rowCount - 4) fetchNextPage();
+    if (hasNextPage && !isFetchingNextPage && !nextPageError && lastIndex >= rowCount - 4) {
+      fetchNextPage();
+    }
   }, [lastIndex, rowCount, hasNextPage, isFetchingNextPage, nextPageError, fetchNextPage]);
 
   return (

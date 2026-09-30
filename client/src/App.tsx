@@ -22,8 +22,8 @@ export default function App() {
   const users = useInfiniteQuery({
     queryKey: ['users', state],
     queryFn: ({ pageParam, signal }) => fetchUsers(state, pageParam, signal),
-    initialPageParam: null as string | null,
-    getNextPageParam: (last) => last.meta.nextCursor,
+    initialPageParam: 0,
+    getNextPageParam: (last) => (last.meta.hasMore ? last.meta.offset + last.data.length : undefined),
     placeholderData: keepPreviousData,
   });
 

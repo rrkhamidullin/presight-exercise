@@ -20,14 +20,15 @@ async function get(path: string) {
 
 async function fetchAll(query: string, limit = 37): Promise<User[]> {
   const out: User[] = [];
-  let cursor: string | null = null;
-  do {
-    const { status, body } = await get(`/api/users?${query}&limit=${limit}${cursor ? `&cursor=${cursor}` : ''}`);
+  let hasMore = true;
+  while (hasMore) {
+    const { status, body } = await get(`/api/users?${query}&limit=${limit}&offset=${out.length}`);
     assert.equal(status, 200, JSON.stringify(body));
+    assert.equal(body.meta.offset, out.length);
     out.push(...body.data);
-    cursor = body.meta.nextCursor;
-    assert.equal(body.meta.hasMore, cursor !== null);
-  } while (cursor);
+    hasMore = body.meta.hasMore;
+    assert.equal(hasMore, out.length < body.meta.total);
+  }
   return out;
 }
 
@@ -116,9 +117,9 @@ describe('GET /api/users', () => {
     assert.equal((await get('/api/users?sort=id')).status, 400);
     assert.equal((await get('/api/users?order=up')).status, 400);
     assert.equal((await get('/api/users?limit=0')).status, 400);
-    assert.equal((await get('/api/users?cursor=garbage')).status, 400);
-    const { body } = await get('/api/users?sort=age&limit=1');
-    assert.equal((await get(`/api/users?sort=last_name&cursor=${body.meta.nextCursor}`)).status, 400);
+    assert.equal((await get('/api/users?offset=-1')).status, 400);
+    assert.equal((await get('/api/users?offset=1.5')).status, 400);
+    assert.equal((await get('/api/users?offset=abc')).status, 400);
   });
 });
 

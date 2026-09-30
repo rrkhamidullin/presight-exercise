@@ -3,7 +3,6 @@ WORKDIR /app
 COPY package.json package-lock.json lerna.json ./
 COPY client/package.json client/
 COPY server/package.json server/
-# trixie ships glibc 2.41, which sqlite3's prebuilt binary requires (>= 2.38).
 RUN npm ci
 COPY client client
 COPY server server
@@ -27,5 +26,4 @@ EXPOSE 3001
 VOLUME ["/data"]
 HEALTHCHECK --interval=10s --timeout=3s --start-period=20s \
   CMD node -e "fetch('http://127.0.0.1:'+process.env.PORT+'/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
-# Migrates, seeds on first start (empty DB), then starts the API + static client.
 CMD ["sh", "-c", "node dist/db/setup.js && node dist/index.js"]

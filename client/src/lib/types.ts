@@ -3,45 +3,50 @@ export type SortField = (typeof SORT_FIELDS)[number];
 export type SortOrder = 'asc' | 'desc';
 
 export interface Filters {
-  q: string;
-  nationalities: string[];
-  hobbies: string[];
+    q: string;
+    nationalities: string[];
+    hobbies: string[];
 }
 
 export interface ViewState extends Filters {
-  sort: SortField;
-  order: SortOrder;
+    sort: SortField;
+    order: SortOrder;
 }
 
 export interface User {
-  id: number;
-  avatar: string;
-  first_name: string;
-  last_name: string;
-  date_of_birth: string;
-  nationality: string;
-  hobbies: string[];
+    id: number;
+    avatar: string;
+    first_name: string;
+    last_name: string;
+    date_of_birth: string;
+    nationality: string;
+    hobbies: string[];
 }
 
 export interface UserPage {
-  data: User[];
-  meta: { total: number; limit: number; hasMore: boolean; nextCursor: string | null };
+    data: User[];
+    meta: {
+        total: number;
+        limit: number;
+        offset: number;
+        hasMore: boolean;
+    };
 }
 
 export interface FacetValue {
-  value: string;
-  count: number;
+    value: string;
+    count: number;
 }
 
 export interface Facets {
-  total: number;
-  nationalities: FacetValue[];
-  hobbies: FacetValue[];
+    total: number;
+    nationalities: FacetValue[];
+    hobbies: FacetValue[];
 }
 
 /** Full years elapsed since a `YYYY-MM-DD` date of birth. */
 export function ageFromDateOfBirth(dob: string, now = new Date()): number {
-  const [y, m, d] = dob.split('-').map(Number);
-  const age = now.getFullYear() - y;
-  return now.getMonth() + 1 < m || (now.getMonth() + 1 === m && now.getDate() < d) ? age - 1 : age;
+    const [y, m, d] = dob.split('-').map(Number);
+    const age = now.getFullYear() - y;
+    return now.getMonth() + 1 < m || (now.getMonth() + 1 === m && now.getDate() < d) ? age - 1 : age;
 }
