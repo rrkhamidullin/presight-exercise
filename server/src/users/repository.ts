@@ -36,7 +36,7 @@ const SORT_COLUMNS: Record<ListParams['sort'], {
     first_name: {column: 'users.first_name', field: 'first_name'},
     last_name: {column: 'users.last_name', field: 'last_name'},
     age: {column: 'users.date_of_birth', field: 'date_of_birth', invert: true},
-    nationality: {column: 'n.name', field: 'nationality'},
+    nationality: {column: 'n.name', field: 'nationality'}
 };
 
 function applyFilters(knex: Knex, queryBuilder: Knex.QueryBuilder, {q, nationalities, hobbies}: UserFilters) {
@@ -80,23 +80,24 @@ export async function listUsers(knex: Knex, params: ListParams): Promise<UserPag
         .limit(limit + 1)
         .offset(offset);
 
+    const selectUsersTotal = applyFilters(knex, selectUsers(knex), params)
+        .count({total: '*'})
+        .first();
+
     const [rows, totalRows] = await Promise.all([
         selectUsersPage,
-        applyFilters(knex, selectUsers(knex), params)
-            .count({total: '*'})
-            .first()
+        selectUsersTotal
     ]);
 
     const hasMore = rows.length > limit;
     const pageRows: Omit<User, 'hobbies'>[] = hasMore ? rows.slice(0, limit) : rows;
 
+    const userIds = pageRows.map((row) => row.id);
+
     const hobbyRows: { user_id: number; name: string }[] = pageRows.length
-        ? await knex('user_hobbies as uh')
-            .join('hobbies as h', 'h.id', 'uh.hobby_id')
-            .whereIn(
-                'uh.user_id',
-                pageRows.map((r) => r.id),
-            )
+        ? await knex('hobbies as h')
+            .join('user_hobbies as uh', 'uh.hobby_id', 'h.id')
+            .whereIn('uh.user_id', userIds)
             .orderBy(['uh.user_id', 'uh.position'])
             .select('uh.user_id', 'h.name')
         : [];
@@ -108,13 +109,18 @@ export async function listUsers(knex: Knex, params: ListParams): Promise<UserPag
         hobbiesByUser.set(user_id, list);
     }
 
+    const data = pageRows.map((row) =>
+        ({...row, hobbies: hobbiesByUser.get(row.id) ?? []}));
+
+    const total = Number((totalRows as { total: number } | undefined)?.total ?? 0);
+
     return {
-        data: pageRows.map((r) => ({...r, hobbies: hobbiesByUser.get(r.id) ?? []})),
+        data: data,
         meta: {
-            total: Number((totalRows as { total: number } | undefined)?.total ?? 0),
-            limit,
-            offset,
-            hasMore,
+            total: total,
+            limit: limit,
+            offset: offset,
+            hasMore: hasMore
         },
     };
 }
@@ -125,37 +131,38 @@ export async function getFacets(knex: Knex, filters: UserFilters, size = 20): Pr
     hobbies: FacetValue[]
 }> {
 
-    const selectUsersNoNationalitiesFilter = applyFilters(knex, selectUsers(knex), {...filters, nationalities: []});
+    const selectNationalities = applyFilters(knex, selectUsers(knex), {...filters, nationalities: []})
+        .select({value: 'n.name'})
+        .count({count: '*'})
+        .groupBy('n.id', 'n.name')
+        .orderBy([
+            {column: 'count', order: 'desc'},
+            {column: 'value', order: 'asc'}
+        ])
+        .limit(size);
+
     const selectUsersAllFilters = () => applyFilters(knex, selectUsers(knex), filters);
-    const selectHobbiesFromSelectedUsers = knex('hobbies as h')
+
+    const selectHobbies = knex('hobbies as h')
         .join('user_hobbies as uh', 'uh.hobby_id', 'h.id')
-        .whereIn('uh.user_id', selectUsersAllFilters().select('users.id'));
+        .whereIn('uh.user_id', selectUsersAllFilters().select('users.id'))
+        .select({value: 'h.name'})
+        .count({count: '*'})
+        .groupBy('h.id', 'h.name')
+        .orderBy([
+            {column: 'count', order: 'desc'},
+            {column: 'value', order: 'asc'}
+        ])
+        .limit(size);
+
+    const selectUsersTotal = selectUsersAllFilters()
+        .count({total: '*'})
+        .first();
 
     const [nationalities, hobbies, totalRows] = await Promise.all([
-
-        selectUsersNoNationalitiesFilter
-            .select({value: 'n.name'})
-            .count({count: '*'})
-            .groupBy('n.id', 'n.name')
-            .orderBy([
-                {column: 'count', order: 'desc'},
-                {column: 'value', order: 'asc'}
-            ])
-            .limit(size),
-
-        selectHobbiesFromSelectedUsers
-            .select({value: 'h.name'})
-            .count({count: '*'})
-            .groupBy('h.id', 'h.name')
-            .orderBy([
-                {column: 'count', order: 'desc'},
-                {column: 'value', order: 'asc'}
-            ])
-            .limit(size),
-
-        selectUsersAllFilters()
-            .count({total: '*'})
-            .first(),
+        selectNationalities,
+        selectHobbies,
+        selectUsersTotal
     ]);
 
     const toFacet = (rows: any[]): FacetValue[] =>
@@ -165,6 +172,6 @@ export async function getFacets(knex: Knex, filters: UserFilters, size = 20): Pr
     return {
         total: Number((totalRows as { total: number } | undefined)?.total ?? 0),
         nationalities: toFacet(nationalities),
-        hobbies: toFacet(hobbies),
+        hobbies: toFacet(hobbies)
     };
 }

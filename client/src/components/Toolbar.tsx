@@ -5,7 +5,7 @@ const SORT_LABELS: Record<SortField, string> = {
   first_name: 'First name',
   last_name: 'Last name',
   age: 'Age',
-  nationality: 'Nationality',
+  nationality: 'Nationality'
 };
 
 interface Props {
