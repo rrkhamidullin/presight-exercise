@@ -25,7 +25,12 @@ export interface User {
 
 export interface UserPage {
     data: User[];
-    meta: { total: number; limit: number; hasMore: boolean; nextCursor: string | null };
+    meta: {
+        total: number;
+        limit: number;
+        offset: number;
+        hasMore: boolean;
+    };
 }
 
 export interface FacetValue {

@@ -5,7 +5,7 @@ const API_BASE = import.meta.env.VITE_API_URL ?? '';
 function filterParams({q, nationalities, hobbies}: Filters): URLSearchParams {
     const params = new URLSearchParams();
     if (q) {
-        params.set('q', q);
+      params.set('q', q);
     }
     nationalities.forEach((n) => params.append('nationality', n));
     hobbies.forEach((h) => params.append('hobby', h));
@@ -23,14 +23,12 @@ async function getJson<T>(path: string, params: URLSearchParams, signal?: AbortS
 
 export const PAGE_SIZE = 60;
 
-export function fetchUsers(state: ViewState, cursor: string | null, signal?: AbortSignal) {
+export function fetchUsers(state: ViewState, offset: number, signal?: AbortSignal) {
     const params = filterParams(state);
     params.set('sort', state.sort);
     params.set('order', state.order);
     params.set('limit', String(PAGE_SIZE));
-    if (cursor) {
-        params.set('cursor', cursor);
-    }
+    params.set('offset', String(offset));
     return getJson<UserPage>('/api/users', params, signal);
 }
 

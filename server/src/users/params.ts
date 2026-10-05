@@ -12,14 +12,7 @@ export interface ListParams extends UserFilters {
     sort: SortField;
     order: SortOrder;
     limit: number;
-    cursor: Cursor | null;
-}
-
-export interface Cursor {
-    sort: SortField;
-    order: SortOrder;
-    value: string | number;
-    id: number;
+    offset: number;
 }
 
 export class BadRequestError extends Error {
@@ -48,27 +41,6 @@ export function parseFilters(query: Record<string, QueryValue>): UserFilters {
     };
 }
 
-export function encodeCursor(cursor: Cursor): string {
-    return Buffer.from(JSON.stringify([cursor.sort, cursor.order, cursor.value, cursor.id])).toString('base64url');
-}
-
-export function decodeCursor(raw: string): Cursor {
-    try {
-        const [sort, order, value, id] = JSON.parse(Buffer.from(raw, 'base64url').toString('utf8'));
-        if (
-            SORT_FIELDS.includes(sort) &&
-            (order === 'asc' || order === 'desc') &&
-            (typeof value === 'string' || typeof value === 'number') &&
-            Number.isInteger(id)
-        ) {
-            return {sort, order, value, id};
-        }
-    } catch {
-        // fall through
-    }
-    throw new BadRequestError('Invalid cursor');
-}
-
 export function parseListParams(query: Record<string, QueryValue>): ListParams {
     const sort = (toSingle(query.sort) ?? 'first_name') as SortField;
     if (!SORT_FIELDS.includes(sort)) {
@@ -86,11 +58,11 @@ export function parseListParams(query: Record<string, QueryValue>): ListParams {
         throw new BadRequestError('limit must be an integer 1-200');
     }
 
-    const cursorRaw = toSingle(query.cursor);
-    const cursor = cursorRaw ? decodeCursor(cursorRaw) : null;
-    if (cursor && (cursor.sort !== sort || cursor.order !== order)) {
-        throw new BadRequestError('cursor does not match the requested sort');
+    const offsetRaw = toSingle(query.offset);
+    const offset = offsetRaw === undefined ? 0 : Number(offsetRaw);
+    if (!Number.isInteger(offset) || offset < 0) {
+        throw new BadRequestError('offset must be a non-negative integer');
     }
 
-    return {...parseFilters(query), sort, order, limit, cursor};
+    return {...parseFilters(query), sort, order, limit, offset};
 }

@@ -1,5 +1,5 @@
 import type {Knex} from 'knex';
-import {encodeCursor, ListParams, UserFilters} from './params';
+import {ListParams, UserFilters} from './params';
 
 export interface User {
     id: number;
@@ -18,13 +18,13 @@ export interface FacetValue {
 
 export interface UserPage {
     data: User[];
-    meta: { total: number; limit: number; hasMore: boolean; nextCursor: string | null };
+    meta: { total: number; limit: number; offset: number; hasMore: boolean };
 }
 
 const escapeLike = (s: string) =>
     s.replace(/[\\%_]/g, (c) => `\\${c}`);
 
-const selectUsersWithNationality =
+const selectUsers =
     (knex: Knex) => knex('users')
         .join('nationalities as n', 'n.id', 'users.nationality_id');
 
@@ -70,30 +70,19 @@ function applyFilters(knex: Knex, queryBuilder: Knex.QueryBuilder, {q, nationali
 
 export async function listUsers(knex: Knex, params: ListParams): Promise<UserPage> {
 
-    const {sort, order, limit, cursor} = params;
-    const {column: column, field, invert} = SORT_COLUMNS[sort];
+    const {sort, order, limit, offset} = params;
+    const {column, invert} = SORT_COLUMNS[sort];
     const direction = invert ? (order === 'asc' ? 'desc' : 'asc') : order;
-    const comparingOperator = direction === 'asc' ? '>' : '<';
 
-    const pageQuery = applyFilters(knex, selectUsersWithNationality(knex), params)
+    const selectUsersPage = applyFilters(knex, selectUsers(knex), params)
         .select('users.id', 'users.avatar', 'users.first_name', 'users.last_name', 'users.date_of_birth', {nationality: 'n.name'})
         .orderBy([{column: column, order: direction}, {column: 'users.id', order: direction}])
-        .limit(limit + 1);
+        .limit(limit + 1)
+        .offset(offset);
 
-    if (cursor) {
-        pageQuery.where((queryBuilder) =>
-            queryBuilder
-                .where(column, comparingOperator, cursor.value)
-                .orWhere((queryBuilder2) =>
-                    queryBuilder2
-                        .where(column, cursor.value)
-                        .andWhere('users.id', comparingOperator, cursor.id))
-        );
-    }
-
-    const [rows, totalRow] = await Promise.all([
-        pageQuery,
-        applyFilters(knex, selectUsersWithNationality(knex), params)
+    const [rows, totalRows] = await Promise.all([
+        selectUsersPage,
+        applyFilters(knex, selectUsers(knex), params)
             .count({total: '*'})
             .first()
     ]);
@@ -119,55 +108,59 @@ export async function listUsers(knex: Knex, params: ListParams): Promise<UserPag
         hobbiesByUser.set(user_id, list);
     }
 
-    const last = pageRows[pageRows.length - 1];
     return {
         data: pageRows.map((r) => ({...r, hobbies: hobbiesByUser.get(r.id) ?? []})),
         meta: {
-            total: Number((totalRow as { total: number } | undefined)?.total ?? 0),
+            total: Number((totalRows as { total: number } | undefined)?.total ?? 0),
             limit,
+            offset,
             hasMore,
-            nextCursor: hasMore && last ? encodeCursor({sort, order, value: last[field] as string, id: last.id}) : null,
         },
     };
 }
 
-export async function getFacets(knex: Knex, filters: UserFilters, size = 20,): Promise<{
+export async function getFacets(knex: Knex, filters: UserFilters, size = 20): Promise<{
     total: number;
     nationalities: FacetValue[];
     hobbies: FacetValue[]
 }> {
 
-    const allUsersQuery = selectUsersWithNationality(knex);
-    const filteredUsersQuery = () => applyFilters(knex, allUsersQuery, filters);
-
-    const nationalitiesFilters = {...filters, nationalities: []};
+    const selectUsersNoNationalitiesFilter = applyFilters(knex, selectUsers(knex), {...filters, nationalities: []});
+    const selectUsersAllFilters = () => applyFilters(knex, selectUsers(knex), filters);
+    const selectHobbiesFromSelectedUsers = knex('hobbies as h')
+        .join('user_hobbies as uh', 'uh.hobby_id', 'h.id')
+        .whereIn('uh.user_id', selectUsersAllFilters().select('users.id'));
 
     const [nationalities, hobbies, totalRows] = await Promise.all([
 
-        applyFilters(knex, allUsersQuery, nationalitiesFilters)
+        selectUsersNoNationalitiesFilter
             .select({value: 'n.name'})
             .count({count: '*'})
             .groupBy('n.id', 'n.name')
-            .orderBy([{column: 'count', order: 'desc'}, {column: 'value', order: 'asc'}])
+            .orderBy([
+                {column: 'count', order: 'desc'},
+                {column: 'value', order: 'asc'}
+            ])
             .limit(size),
 
-        knex('user_hobbies as uh')
-            .join('hobbies as h', 'h.id', 'uh.hobby_id')
-            .whereIn('uh.user_id', filteredUsersQuery()
-                .select('users.id'))
+        selectHobbiesFromSelectedUsers
             .select({value: 'h.name'})
             .count({count: '*'})
             .groupBy('h.id', 'h.name')
-            .orderBy([{column: 'count', order: 'desc'}, {column: 'value', order: 'asc'}])
+            .orderBy([
+                {column: 'count', order: 'desc'},
+                {column: 'value', order: 'asc'}
+            ])
             .limit(size),
 
-        filteredUsersQuery()
+        selectUsersAllFilters()
             .count({total: '*'})
-            .first()
+            .first(),
     ]);
 
-    const toFacet = (rows: any[]): FacetValue[] => rows.map((r) =>
-        ({value: r.value, count: Number(r.count)}));
+    const toFacet = (rows: any[]): FacetValue[] =>
+        rows.map((row) =>
+            ({value: row.value, count: Number(row.count)}));
 
     return {
         total: Number((totalRows as { total: number } | undefined)?.total ?? 0),

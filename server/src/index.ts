@@ -1,5 +1,5 @@
-import {createApp} from './app';
-import {createDb} from './db/knex';
+import { createApp } from './app';
+import { createDb } from './db/knex';
 
 const port = Number(process.env.PORT ?? 3001);
 const db = createDb();
