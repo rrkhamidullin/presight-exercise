@@ -1,13 +1,32 @@
 {
   "name": "presight-server",
   "version": "1.0.0",
-  "main": "index.js",
+  "private": true,
   "license": "MIT",
+  "main": "dist/index.js",
+  "scripts": {
+    "start": "npm run db:setup && tsx watch src/index.ts",
+    "start:prod": "node dist/db/setup.js && node dist/index.js",
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "knex": "NODE_OPTIONS='--import tsx' knex --knexfile src/db/knexfile.ts",
+    "db:migrate": "npm run knex -- migrate:latest",
+    "db:seed": "npm run db:migrate && npm run knex -- seed:run",
+    "db:setup": "tsx src/db/setup.ts",
+    "test": "tsx --test test/*.test.ts"
+  },
   "dependencies": {
-    "express": "~5.1.0"
+    "@faker-js/faker": "~9.6.0",
+    "cors": "~2.8.5",
+    "express": "~5.1.0",
+    "knex": "^3.3.0",
+    "sqlite3": "^6.0.1"
   },
   "devDependencies": {
+    "@types/cors": "~2.8.17",
     "@types/express": "~5.0.1",
-    "@types/node-fetch": "~2.6.12"
+    "@types/node": "~20.17.0",
+    "tsx": "~4.19.4",
+    "typescript": "~5.8.3"
   }
 }
